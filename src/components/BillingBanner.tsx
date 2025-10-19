@@ -5,7 +5,13 @@ export default function BillingBanner() {
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/me/billing");
+      // Force no-cache pour toujours récupérer le statut à jour
+      const res = await fetch("/api/me/billing", { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       if (!res.ok) return;
       const b = await res.json();
       if (b.plan_status === "past_due") {
