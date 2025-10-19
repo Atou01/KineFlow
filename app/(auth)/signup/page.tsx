@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function SignUpPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
