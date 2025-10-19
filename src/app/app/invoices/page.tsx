@@ -1,5 +1,8 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { useEffect, useState } from "react";
 
 type Row = { id: string; number: string; issue_date: string; total_cents: number; paid: boolean };
