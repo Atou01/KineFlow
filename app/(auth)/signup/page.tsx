@@ -17,27 +17,48 @@ export default function SignUpPage() {
     setLoading(true);
     setMessage("");
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { workspace_name: "Mon Cabinet" },
-      },
-    });
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { workspace_name: "Mon Cabinet" },
+        },
+      });
 
-    setLoading(false);
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
+      // 1) Cas idéal : session dispo de suite
+      if (data?.session) {
+        router.push("/app/dashboard");
+        return;
+      }
 
-    // ✅ Si confirmation désactivée → redirection immédiate
-    if (data.session) {
-      router.push("/app/dashboard");
-    } else {
-      // ✅ Si confirmation activée → message d'avertissement
-      setMessage("Un e-mail de confirmation a été envoyé.");
+      // 2) Fallback universel : on se connecte explicitement
+      const { data: signInData, error: signInError } =
+        await supabase.auth.signInWithPassword({ email, password });
+
+      if (signInError) {
+        setMessage(signInError.message || "Connexion impossible après inscription.");
+        setLoading(false);
+        return;
+      }
+
+      if (signInData?.session) {
+        router.push("/app/dashboard");
+        return;
+      }
+
+      // 3) Dernier recours : message explicite
+      setMessage("Compte créé. Connecte-toi avec tes identifiants.");
+    } catch (err: any) {
+      setMessage(err?.message ?? "Erreur inattendue.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,6 +76,7 @@ export default function SignUpPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          autoComplete="email"
         />
         <input
           type="password"
@@ -63,6 +85,7 @@ export default function SignUpPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          autoComplete="new-password"
         />
         <button
           type="submit"
