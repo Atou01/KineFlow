@@ -50,16 +50,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   doc.end();
 
-  // Wait for the PDF buffer to finish generating
-  const pdfBuffer = await done;
+  // Attendre le buffer final généré par pdfkit
+  const pdfBuffer = await done; // Buffer<...>
 
-  // ✅ Convert to Blob for compatibility with Response
-  const blob = new Blob([pdfBuffer], { type: "application/pdf" });
-
-  return new Response(blob, {
+  // ✅ Utiliser Uint8Array au lieu de Buffer/Blob pour Response
+  return new Response(new Uint8Array(pdfBuffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename=invoice-${params.id}.pdf`,
+      "Content-Disposition": `inline; filename="invoice-${params.id}.pdf"`,
       "Cache-Control": "private, max-age=0, must-revalidate",
     },
   });
