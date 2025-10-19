@@ -1,8 +1,5 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 export default function BillingPage() {
   async function openPortal() {
     const res = await fetch("/api/stripe/portal", { method: "POST" });
