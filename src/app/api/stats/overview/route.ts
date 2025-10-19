@@ -2,8 +2,6 @@ import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import {
-
-export const dynamic = 'force-dynamic';
   startOfWeek,
   endOfWeek,
   startOfMonth,
@@ -12,6 +10,8 @@ export const dynamic = 'force-dynamic';
   addDays,
   formatISO
 } from "date-fns";
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest) {
   const supabase = createRouteHandlerClient({ cookies });
