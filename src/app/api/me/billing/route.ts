@@ -1,5 +1,7 @@
 import { getCurrentWorkspaceBilling } from "@/lib/billing";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const b = await getCurrentWorkspaceBilling();

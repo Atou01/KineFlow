@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { fmt } from "@/lib/money";
 
+export const dynamic = 'force-dynamic';
+
 export const runtime = "nodejs";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {

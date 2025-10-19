@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import {
+
+export const dynamic = 'force-dynamic';
   startOfWeek,
   endOfWeek,
   startOfMonth,

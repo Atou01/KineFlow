@@ -4,6 +4,8 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { nextInvoiceNumber } from "@/lib/invoices";
 import { enforceQuota } from "@/lib/billing";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies });
   const { data: { user } } = await supabase.auth.getUser();

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+export const dynamic = 'force-dynamic';
 export const config = { api: { bodyParser: false } } as any; // Next.js (App Router ignore, mais on lit le raw body)
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
