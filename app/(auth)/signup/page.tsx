@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-export default function SignUp() {
+export default function SignUpPage() {
   const supabase = createClientComponentClient();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,45 +15,64 @@ export default function SignUp() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setMessage("");
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { workspace_name: "Mon Cabinet" }
-      }
+        data: { workspace_name: "Mon Cabinet" },
+      },
     });
 
-    if (error) setMessage(error.message);
-    else setMessage("Vérifie ta boîte mail pour confirmer ton compte.");
     setLoading(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    // ✅ Si confirmation désactivée → redirection immédiate
+    if (data.session) {
+      router.push("/app/dashboard");
+    } else {
+      // ✅ Si confirmation activée → message d'avertissement
+      setMessage("Un e-mail de confirmation a été envoyé.");
+    }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <form onSubmit={handleSignUp} className="bg-white p-8 rounded-2xl shadow w-96">
-        <h1 className="text-2xl font-bold mb-6 text-center">Créer un compte</h1>
+    <div className="flex items-center justify-center h-screen bg-gray-50">
+      <form
+        onSubmit={handleSignUp}
+        className="bg-white p-8 rounded shadow-md w-80 space-y-4"
+      >
+        <h1 className="text-xl font-bold text-center">Créer un compte</h1>
         <input
           type="email"
           placeholder="Email"
-          className="border rounded w-full p-2 mb-3"
+          className="w-full border p-2 rounded"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
         />
         <input
           type="password"
           placeholder="Mot de passe"
-          className="border rounded w-full p-2 mb-3"
+          className="w-full border p-2 rounded"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
         <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded"
           disabled={loading}
-          className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700"
         >
           {loading ? "Création..." : "S'inscrire"}
         </button>
-        {message && <p className="text-center text-sm mt-4">{message}</p>}
+
+        {message && <p className="text-center text-sm text-gray-700">{message}</p>}
       </form>
     </div>
   );
