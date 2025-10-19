@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { fmt } from "@/lib/money";
 
+export const runtime = "nodejs";
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createRouteHandlerClient({ cookies });
 
@@ -47,6 +49,18 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   doc.fontSize(14).text(`Total : ${fmt(inv.total_cents)}`, { underline: true });
 
   doc.end();
-  const pdf = await done;
-  return new Response(pdf, { headers: { "Content-Type": "application/pdf" } });
+
+  // Wait for the PDF buffer to finish generating
+  const pdfBuffer = await done;
+
+  // ✅ Convert to Blob for compatibility with Response
+  const blob = new Blob([pdfBuffer], { type: "application/pdf" });
+
+  return new Response(blob, {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename=invoice-${params.id}.pdf`,
+      "Cache-Control": "private, max-age=0, must-revalidate",
+    },
+  });
 }
