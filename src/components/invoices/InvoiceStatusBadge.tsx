@@ -24,7 +24,7 @@ export function InvoiceStatusBadge({ status, size = "md" }: InvoiceStatusBadgePr
     lg: "w-5 h-5",
   };
   
-  const colorClasses = {
+  const colorClasses: Record<string, string> = {
     gray: "bg-gray-100 text-gray-700 border-gray-200",
     blue: "bg-blue-100 text-blue-700 border-blue-200",
     green: "bg-green-100 text-green-700 border-green-200",
@@ -44,7 +44,7 @@ export function InvoiceStatusBadge({ status, size = "md" }: InvoiceStatusBadgePr
       className={`
         inline-flex items-center gap-1.5 rounded-full border font-medium
         ${sizeClasses[size]}
-        ${colorClasses[color]}
+        ${colorClasses[color] || colorClasses.gray}
       `}
     >
       <Icon className={iconSizes[size]} />

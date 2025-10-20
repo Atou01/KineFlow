@@ -1,91 +1,237 @@
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { nextInvoiceNumber } from "@/lib/invoices";
+import { withApiHandler } from "@/lib/api/apiHandler";
+import {
+  AuthenticationError,
+  ValidationError,
+  DatabaseError,
+  QuotaExceededError,
+} from "@/lib/errors/AppError";
 import { enforceQuota } from "@/lib/billing";
+import {
+  generateInvoiceNumber,
+  calculateInvoiceTotal,
+  calculateDueDate,
+  getInvoiceSettings,
+} from "@/lib/invoices/helpers";
+import { eurosToCents } from "@/types/invoice";
+import type { Invoice, InvoiceFormData } from "@/types/invoice";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+// ============================================
+// GET /api/invoices - Liste des factures
+// ============================================
+export const GET = withApiHandler(async (req: NextRequest) => {
   const supabase = createRouteHandlerClient({ cookies });
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
+  
+  // Auth check
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new AuthenticationError();
+  }
 
-  // Récupérer workspace_id via membership le plus récent (MVP)
-  const { data: wm } = await supabase.from("workspace_members")
-    .select("workspace_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (!wm) return new Response("No workspace", { status: 400 });
+  // Get workspace
+  const { data: wm, error: wmError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+    
+  if (wmError) {
+    throw new DatabaseError("Erreur lors de la récupération du workspace", { error: wmError });
+  }
+  
+  if (!wm) {
+    throw new ValidationError("Aucun workspace trouvé");
+  }
 
-  const { data, error } = await supabase.from("invoices")
-    .select("id, number, issue_date, total_cents, paid")
+  // Parse query params pour filtres
+  const url = new URL(req.url);
+  const status = url.searchParams.get('status');
+  const clientId = url.searchParams.get('client_id');
+  const fromDate = url.searchParams.get('from_date');
+  const toDate = url.searchParams.get('to_date');
+  const search = url.searchParams.get('search');
+
+  // Build query
+  let query = supabase
+    .from("invoices")
+    .select(`
+      id,
+      invoice_number,
+      issue_date,
+      due_date,
+      status,
+      total_cents,
+      paid_at,
+      client:clients (
+        id,
+        first_name,
+        last_name,
+        email
+      ),
+      created_at
+    `)
     .eq("workspace_id", wm.workspace_id)
-    .order("created_at", { ascending: false });
-  if (error) return new Response(error.message, { status: 400 });
-  return Response.json(data);
-}
+    .order("issue_date", { ascending: false });
 
-export async function POST(req: NextRequest) {
+  // Apply filters
+  if (status) {
+    query = query.eq('status', status);
+  }
+  if (clientId) {
+    query = query.eq('client_id', clientId);
+  }
+  if (fromDate) {
+    query = query.gte('issue_date', fromDate);
+  }
+  if (toDate) {
+    query = query.lte('issue_date', toDate);
+  }
+  if (search) {
+    query = query.or(`invoice_number.ilike.%${search}%,notes.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query;
+    
+  if (error) {
+    throw new DatabaseError("Erreur lors de la récupération des factures", { error });
+  }
+
+  return data || [];
+});
+
+// ============================================
+// POST /api/invoices - Créer une facture
+// ============================================
+export const POST = withApiHandler(async (req: NextRequest) => {
+  // Check quota
   const quota = await enforceQuota("invoices", "issue_date");
   if (!quota.allowed) {
-    return Response.json(
-      { error: quota.reason, upgrade_url: "/app/billing" },
-      { status: 402 }
-    );
+    throw new QuotaExceededError(quota.reason || "Quota de factures atteint", "/app/billing");
   }
 
   const supabase = createRouteHandlerClient({ cookies });
-  const body = await req.json();
+  const body: InvoiceFormData = await req.json();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
-
-  const { data: wm } = await supabase.from("workspace_members")
-    .select("workspace_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (!wm) return new Response("No workspace", { status: 400 });
-
-  // settings pour prefix
-  const { data: st } = await supabase.from("settings")
-    .select("invoice_prefix").eq("workspace_id", wm.workspace_id).maybeSingle();
-  const prefix = st?.invoice_prefix || "INV-";
-
-  // calcul rapide (MVP)
-  const items = Array.isArray(body.items) ? body.items : [];
-  const subtotal = items.reduce((acc:number, it:any) => acc + (Number(it.qty||1) * Number(it.unit_price_cents||0)), 0);
-  const taxRate = Number(body.tax_rate || 0);
-  const total = Math.round(subtotal * (1 + taxRate/100));
-
-  // trouver le prochain numéro (compte les factures existantes année en cours)
-  const year = new Date().getFullYear();
-  const { data: existing } = await supabase.from("invoices")
-    .select("id").eq("workspace_id", wm.workspace_id)
-    .like("number", `${prefix}${year}-%`);
-  const seq = (existing?.length || 0) + 1;
-  const number = nextInvoiceNumber(prefix, new Date(), seq);
-
-  const { data: ins, error } = await supabase.from("invoices").insert({
-    workspace_id: wm.workspace_id,
-    client_id: body.client_id ?? null,
-    number,
-    issue_date: body.issue_date ?? new Date().toISOString().slice(0,10),
-    due_date: body.due_date ?? null,
-    subtotal_cents: subtotal,
-    tax_rate: taxRate,
-    total_cents: total,
-    paid: false
-  }).select("id").maybeSingle();
-  if (error) return new Response(error.message, { status: 400 });
-
-  if (items.length && ins?.id) {
-    const rows = items.map((it:any)=> ({
-      invoice_id: ins.id,
-      description: String(it.description||"Ligne"),
-      qty: Number(it.qty||1),
-      unit_price_cents: Number(it.unit_price_cents||0),
-      total_cents: Number(it.qty||1) * Number(it.unit_price_cents||0)
-    }));
-    const { error: e2 } = await supabase.from("invoice_items").insert(rows);
-    if (e2) return new Response(e2.message, { status: 400 });
+  // Validation
+  if (!body.client_id) {
+    throw new ValidationError("Le client est obligatoire");
+  }
+  if (!body.items || body.items.length === 0) {
+    throw new ValidationError("Au moins un item est requis");
+  }
+  if (!body.issue_date) {
+    throw new ValidationError("La date d'émission est obligatoire");
   }
 
-  return Response.json({ id: ins?.id, number });
-}
+  // Auth check
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new AuthenticationError();
+  }
+
+  // Get workspace
+  const { data: wm, error: wmError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+    
+  if (wmError) {
+    throw new DatabaseError("Erreur workspace", { error: wmError });
+  }
+  
+  if (!wm) {
+    throw new ValidationError("Aucun workspace trouvé");
+  }
+
+  // Get invoice settings
+  const settings = await getInvoiceSettings(wm.workspace_id);
+
+  // Generate invoice number
+  const invoiceNumber = await generateInvoiceNumber(wm.workspace_id);
+
+  // Calculate totals
+  const { subtotalCents, taxAmountCents, totalCents } = calculateInvoiceTotal(
+    body.items,
+    body.tax_rate || settings.default_tax_rate,
+    body.discount_cents || 0
+  );
+
+  // Calculate due date if not provided
+  const dueDate = body.due_date || calculateDueDate(
+    body.issue_date,
+    settings.default_due_days
+  );
+
+  // Create invoice
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("invoices")
+    .insert({
+      workspace_id: wm.workspace_id,
+      client_id: body.client_id,
+      invoice_number: invoiceNumber,
+      issue_date: body.issue_date,
+      due_date: dueDate,
+      status: 'draft',
+      subtotal_cents: subtotalCents,
+      tax_rate: body.tax_rate || settings.default_tax_rate,
+      tax_amount_cents: taxAmountCents,
+      discount_cents: body.discount_cents || 0,
+      total_cents: totalCents,
+      notes: body.notes,
+      internal_notes: body.internal_notes,
+      terms: body.terms || settings.default_payment_terms,
+      created_by: user.id,
+    })
+    .select()
+    .single();
+    
+  if (invoiceError) {
+    throw new DatabaseError("Erreur lors de la création de la facture", { error: invoiceError });
+  }
+
+  // Create invoice items
+  const itemsToInsert = body.items.map((item, index) => ({
+    invoice_id: invoice.id,
+    description: item.description,
+    quantity: item.quantity,
+    unit_price_cents: eurosToCents(item.unit_price),
+    total_cents: eurosToCents(item.quantity * item.unit_price),
+    position: index,
+  }));
+
+  const { error: itemsError } = await supabase
+    .from("invoice_items")
+    .insert(itemsToInsert);
+    
+  if (itemsError) {
+    // Rollback: delete invoice
+    await supabase.from("invoices").delete().eq("id", invoice.id);
+    throw new DatabaseError("Erreur lors de la création des items", { error: itemsError });
+  }
+
+  // Return created invoice with items
+  const { data: fullInvoice, error: fetchError } = await supabase
+    .from("invoices")
+    .select(`
+      *,
+      client:clients (*),
+      items:invoice_items (*)
+    `)
+    .eq("id", invoice.id)
+    .single();
+    
+  if (fetchError) {
+    throw new DatabaseError("Erreur lors de la récupération de la facture", { error: fetchError });
+  }
+
+  return fullInvoice;
+});
