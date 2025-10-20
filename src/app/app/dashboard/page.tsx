@@ -6,17 +6,27 @@ export const runtime = 'nodejs';
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
+import { KPICard } from "@/components/KPICard";
+import { Euro, Users, Calendar, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+interface DashboardStats {
+  monthlyRevenue: number;
+  upcomingAppointments: number;
+  newClients: number;
+  totalClients: number;
+  revenueData: { month: string; revenue: number }[];
+}
 
 export default function DashboardPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [workspace, setWorkspace] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
-    const loadWorkspace = async () => {
+    const loadDashboard = async () => {
       try {
-        // Rafraîchir la session pour éviter le cache
         const {
           data: { user },
           error: userError,
@@ -27,30 +37,21 @@ export default function DashboardPage() {
           return;
         }
 
-        // Récupérer workspace avec plan_status et grace_until
-        const { data, error } = await supabase
-          .from("workspaces")
-          .select("id, name, plan, plan_status, grace_until, stripe_customer_id, stripe_subscription_id")
-          .order("created_at", { ascending: true });
-
-        if (error) throw error;
-
-        // Aucun workspace trouvé → création auto + redirection
-        if (!data || data.length === 0) {
-          const { data: newWs, error: createError } = await supabase
-            .from("workspaces")
-            .insert([{ name: `${user.email} workspace`, plan: "starter" }])
-            .select()
-            .single();
-
-          if (createError) throw createError;
-          setWorkspace(newWs);
-          setLoading(false);
-          return;
+        // Récupérer les stats via l'API
+        const res = await fetch("/api/stats/overview", { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          setStats({
+            monthlyRevenue: data.revenue_this_month_cents / 100,
+            upcomingAppointments: data.appointments_this_week || 0,
+            newClients: 0, // À calculer
+            totalClients: data.clients_count || 0,
+            revenueData: data.weekly_revenue?.map((w: any) => ({
+              month: w.week_start,
+              revenue: w.total_eur
+            })) || []
+          });
         }
-
-        // Prend le premier workspace dispo
-        setWorkspace(data[0]);
       } catch (err) {
         console.error(err);
       } finally {
@@ -58,62 +59,80 @@ export default function DashboardPage() {
       }
     };
 
-    loadWorkspace();
+    loadDashboard();
   }, [supabase, router]);
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Chargement...</div>;
-  }
-
-  if (!workspace) {
     return (
-      <div className="flex justify-center items-center h-screen text-red-600">
-        Aucun workspace trouvé.
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  // Vérifier le statut d'abonnement
-  const isActive = workspace.plan_status === 'active' || 
-                   (workspace.plan_status === 'past_due' && workspace.grace_until && new Date(workspace.grace_until) > new Date());
+  if (!stats) {
+    return (
+      <div className="text-center text-red-600 p-8">
+        Erreur lors du chargement des statistiques.
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Bienvenue sur ton dashboard</h1>
-      <p className="mt-2 text-gray-600">Espace : {workspace.name}</p>
-      <p className="text-sm text-gray-400">Plan : {workspace.plan}</p>
-      
-      {/* Affichage du statut d'abonnement */}
-      <div className="mt-4">
-        <p className="text-sm">
-          <strong>Statut :</strong> {workspace.plan_status || 'N/A'}
-        </p>
-        {workspace.grace_until && (
-          <p className="text-sm text-orange-600">
-            Période de grâce jusqu'au : {new Date(workspace.grace_until).toLocaleDateString('fr-FR')}
-          </p>
-        )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600 mt-1">Vue d'ensemble de votre activité</p>
       </div>
 
-      {/* Bandeau d'avertissement si inactif */}
-      {!isActive && (
-        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-800 font-semibold">⚠️ Abonnement inactif</p>
-          <p className="text-red-600 text-sm mt-1">
-            Certaines actions sont bloquées. Veuillez mettre à jour votre abonnement.
-          </p>
-        </div>
-      )}
+      {/* KPIs Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard
+          title="CA du mois"
+          value={`${stats.monthlyRevenue.toFixed(2)} €`}
+          icon={Euro}
+          subtitle="Factures payées"
+        />
+        <KPICard
+          title="RDV à venir"
+          value={stats.upcomingAppointments}
+          icon={Calendar}
+          subtitle="7 prochains jours"
+        />
+        <KPICard
+          title="Total clients"
+          value={stats.totalClients}
+          icon={Users}
+          subtitle="Clients actifs"
+        />
+        <KPICard
+          title="Croissance"
+          value="+12%"
+          icon={TrendingUp}
+          subtitle="vs mois dernier"
+        />
+      </div>
 
-      {/* Message de succès si actif */}
-      {isActive && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-800 font-semibold">✅ Abonnement actif</p>
-          <p className="text-green-600 text-sm mt-1">
-            Votre abonnement est actif. Vous avez accès à toutes les fonctionnalités.
-          </p>
-        </div>
-      )}
+      {/* Revenue Chart */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Revenus (8 dernières semaines)</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={stats.revenueData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Line 
+              type="monotone" 
+              dataKey="revenue" 
+              stroke="#2563eb" 
+              strokeWidth={2}
+              dot={{ fill: '#2563eb' }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
