@@ -2,12 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { initSentry } from "@/lib/monitoring/sentry";
-
-// Initialize Sentry
-if (typeof window !== "undefined") {
-  initSentry();
-}
 
 export const metadata: Metadata = {
   title: "FlowPro",
