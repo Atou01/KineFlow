@@ -7,6 +7,9 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import moment from "moment";
 import "moment/locale/fr";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 moment.locale("fr");
 const localizer = momentLocalizer(moment);
@@ -29,12 +32,13 @@ type EventType = {
 };
 
 export default function AgendaPage() {
+  const router = useRouter();
   const [events, setEvents] = useState<EventType[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/appointments");
+    const res = await fetch("/api/appointments", { cache: 'no-store' });
     const data: Appointment[] = await res.json();
     const mapped = data.map(a => ({
       id: a.id,
@@ -48,19 +52,16 @@ export default function AgendaPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleSelectSlot(slotInfo: any) {
-    const date = slotInfo.start;
-    await fetch("/api/appointments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: null,
-        date,
-        duration_minutes: 30,
-        status: "planned"
-      })
-    });
-    load();
+  function handleSelectSlot(slotInfo: any) {
+    // Rediriger vers le formulaire de création avec la date pré-remplie
+    const date = moment(slotInfo.start).format('YYYY-MM-DD');
+    const time = moment(slotInfo.start).format('HH:mm');
+    router.push(`/app/agenda/new?date=${date}&time=${time}`);
+  }
+
+  function handleSelectEvent(event: any) {
+    // Rediriger vers le formulaire d'édition
+    router.push(`/app/agenda/${event.id}/edit`);
   }
 
   async function handleEventDrop({ event, start }: any) {
@@ -76,23 +77,58 @@ export default function AgendaPage() {
     load();
   }
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-4">Agenda</h1>
-      {loading ? (
-        <p>Chargement...</p>
-      ) : (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
+          <p className="text-gray-600 mt-1">{events.length} rendez-vous</p>
+        </div>
+        <Link
+          href="/app/agenda/new"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Nouveau RDV
+        </Link>
+      </div>
+
+      {/* Calendar */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <DnDCalendar
           localizer={localizer}
           events={events}
           startAccessor={(event: any) => event.start}
           endAccessor={(event: any) => event.end}
           selectable
-          style={{ height: 700, background: "white", borderRadius: "1rem", padding: "1rem" }}
+          style={{ height: 700 }}
           onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
           onEventDrop={handleEventDrop}
+          messages={{
+            next: "Suivant",
+            previous: "Précédent",
+            today: "Aujourd'hui",
+            month: "Mois",
+            week: "Semaine",
+            day: "Jour",
+            agenda: "Agenda",
+            date: "Date",
+            time: "Heure",
+            event: "Événement",
+            noEventsInRange: "Aucun rendez-vous dans cette période",
+          }}
         />
-      )}
+      </div>
     </div>
   );
 }

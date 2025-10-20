@@ -46,7 +46,9 @@ export async function POST(req: NextRequest) {
     client_id: body.client_id,
     date: body.date,
     duration_minutes: body.duration_minutes ?? 30,
-    status: body.status ?? 'planned'
+    status: body.status ?? 'planned',
+    type: body.type ?? null,
+    notes: body.notes ?? null
   }).select("id").maybeSingle();
   if (error) return new Response(error.message, { status: 400 });
   return Response.json(data);
