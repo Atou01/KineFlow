@@ -1,19 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Plus, Mail, Phone, Edit } from "lucide-react";
 
-type Client = { id: string; first_name: string; last_name: string; email: string; phone: string };
+type Client = { id: string; first_name: string; last_name: string; email: string; phone: string; created_at: string };
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "" });
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/clients");
+    const res = await fetch("/api/clients", { cache: 'no-store' });
     const data = await res.json();
     setClients(data || []);
     setLoading(false);
@@ -21,103 +20,110 @@ export default function ClientsPage() {
 
   useEffect(() => { load(); }, []);
 
-  async function createClient() {
-    setCreating(true);
-    await fetch("/api/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    });
-    setCreating(false);
-    setShowForm(false);
-    setForm({ first_name: "", last_name: "", email: "", phone: "" });
-    load();
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Clients</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-black text-white px-3 py-2 rounded"
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Clients</h1>
+          <p className="text-gray-600 mt-1">{clients.length} client{clients.length > 1 ? 's' : ''}</p>
+        </div>
+        <Link
+          href="/app/clients/new"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          {showForm ? "Annuler" : "+ Nouveau client"}
-        </button>
+          <Plus className="w-5 h-5" />
+          Nouveau client
+        </Link>
       </div>
 
-      {showForm && (
-        <div className="bg-white p-6 rounded-xl shadow space-y-4">
-          <h2 className="text-lg font-semibold">Ajouter un client</h2>
-          <input
-            type="text"
-            placeholder="Prénom"
-            className="border rounded w-full p-2"
-            value={form.first_name}
-            onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Nom"
-            className="border rounded w-full p-2"
-            value={form.last_name}
-            onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            className="border rounded w-full p-2"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <input
-            type="tel"
-            placeholder="Téléphone"
-            className="border rounded w-full p-2"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <button
-            onClick={createClient}
-            disabled={creating || !form.first_name || !form.last_name}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {creating ? "Création..." : "Créer"}
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <p>Chargement…</p>
-      ) : (
-        <table className="w-full bg-white rounded-xl shadow overflow-hidden">
-          <thead className="bg-gray-100 text-left">
-            <tr>
-              <th className="p-3">Prénom</th>
-              <th className="p-3">Nom</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Téléphone</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map(c => (
-              <tr key={c.id} className="border-t">
-                <td className="p-3">{c.first_name}</td>
-                <td className="p-3">{c.last_name}</td>
-                <td className="p-3">{c.email || "—"}</td>
-                <td className="p-3">{c.phone || "—"}</td>
-                <td className="p-3">
-                  <a className="underline" href={`/app/clients/${c.id}`}>Voir détails</a>
-                </td>
+      {/* Liste des clients */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {clients.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">Aucun client pour le moment</p>
+            <Link
+              href="/app/clients/new"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Créer votre premier client
+            </Link>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Nom
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Créé le
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            ))}
-            {clients.length === 0 && (
-              <tr><td className="p-3" colSpan={5}>Aucun client. Ajoutez-en un.</td></tr>
-            )}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {clients.map((client) => (
+                <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="font-medium text-gray-900">
+                      {client.first_name} {client.last_name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-1">
+                      {client.email && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Mail className="w-4 h-4" />
+                          {client.email}
+                        </div>
+                      )}
+                      {client.phone && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone className="w-4 h-4" />
+                          {client.phone}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(client.created_at).toLocaleDateString('fr-FR')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/app/clients/${client.id}`}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Voir
+                      </Link>
+                      <Link
+                        href={`/app/clients/${client.id}/edit`}
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}</div>
     </div>
   );
 }

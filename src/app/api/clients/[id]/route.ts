@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, workspace_id, first_name, last_name, email, phone, notes, created_at")
+    .select("id, workspace_id, first_name, last_name, email, phone, birthdate, notes, created_at")
     .eq("id", params.id)
     .maybeSingle();
   if (error || !client) return new Response("Not found", { status: 404 });
@@ -33,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       last_name: body.last_name,
       email: body.email ?? null,
       phone: body.phone ?? null,
+      birthdate: body.birthdate ?? null,
       notes: body.notes ?? null
     })
     .eq("id", params.id);

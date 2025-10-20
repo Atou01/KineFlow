@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     last_name: body.last_name,
     email: body.email ?? null,
     phone: body.phone ?? null,
+    birthdate: body.birthdate ?? null,
     notes: body.notes ?? null
   }).select("id").maybeSingle();
   if (error) return new Response(error.message, { status: 400 });
