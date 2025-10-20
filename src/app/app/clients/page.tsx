@@ -12,10 +12,24 @@ export default function ClientsPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/clients", { cache: 'no-store' });
-    const data = await res.json();
-    setClients(data || []);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/clients", { cache: 'no-store' });
+      const data = await res.json();
+      // Protéger contre les erreurs API qui retournent { error: ... }
+      if (Array.isArray(data)) {
+        setClients(data);
+      } else if (data?.clients && Array.isArray(data.clients)) {
+        setClients(data.clients);
+      } else {
+        console.error("API returned non-array:", data);
+        setClients([]);
+      }
+    } catch (error) {
+      console.error("Failed to load clients:", error);
+      setClients([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);

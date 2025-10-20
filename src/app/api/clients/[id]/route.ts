@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, workspace_id, first_name, last_name, email, phone, notes, created_at")
+    .select("id, workspace_id, first_name, last_name, email, phone, created_at")
     .eq("id", params.id)
     .maybeSingle();
   if (error) {
@@ -36,8 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       first_name: body.first_name,
       last_name: body.last_name,
       email: body.email ?? null,
-      phone: body.phone ?? null,
-      notes: body.notes ?? null
+      phone: body.phone ?? null
     })
     .eq("id", params.id);
   if (error) {

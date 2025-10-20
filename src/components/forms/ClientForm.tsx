@@ -12,7 +12,6 @@ const clientSchema = z.object({
   last_name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide").optional().or(z.literal("")),
   phone: z.string().min(10, "Numéro de téléphone invalide").optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
@@ -154,20 +153,6 @@ export function ClientForm({ initialData, clientId, mode }: ClientFormProps) {
               <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>
             )}
           </div>
-        </div>
-
-        {/* Notes */}
-        <div className="mt-6">
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
-            Notes
-          </label>
-          <textarea
-            {...register("notes")}
-            id="notes"
-            rows={4}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Notes médicales, allergies, etc."
-          />
         </div>
       </div>
 
