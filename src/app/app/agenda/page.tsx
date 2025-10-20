@@ -18,9 +18,10 @@ const DnDCalendar = withDragAndDrop(Calendar);
 type Appointment = {
   id: string;
   client_id: string | null;
-  date: string;
-  duration_minutes: number;
+  start_time: string;
+  end_time: string;
   status: string;
+  title?: string;
   client_name?: string;
 };
 
@@ -42,9 +43,9 @@ export default function AgendaPage() {
     const data: Appointment[] = await res.json();
     const mapped = data.map(a => ({
       id: a.id,
-      title: a.client_name || "RDV",
-      start: new Date(a.date),
-      end: new Date(new Date(a.date).getTime() + a.duration_minutes * 60000)
+      title: a.title || a.client_name || "RDV",
+      start: new Date(a.start_time),
+      end: new Date(a.end_time)
     }));
     setEvents(mapped);
     setLoading(false);
@@ -64,13 +65,18 @@ export default function AgendaPage() {
     router.push(`/app/agenda/${event.id}/edit`);
   }
 
-  async function handleEventDrop({ event, start }: any) {
+  async function handleEventDrop({ event, start, end }: any) {
+    const date = moment(start).format('YYYY-MM-DD');
+    const time = moment(start).format('HH:mm');
+    const duration_minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+    
     await fetch(`/api/appointments/${event.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        date: start,
-        duration_minutes: 30,
+        date,
+        time,
+        duration_minutes,
         status: "planned"
       })
     });

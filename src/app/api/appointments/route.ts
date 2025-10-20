@@ -15,9 +15,9 @@ export async function GET() {
   if (!wm) return new Response("No workspace", { status: 400 });
 
   const { data, error } = await supabase.from("appointments")
-    .select("id, client_id, date, duration_minutes, status")
+    .select("id, client_id, start_time, end_time, status, title")
     .eq("workspace_id", wm.workspace_id)
-    .order("date", { ascending: true });
+    .order("start_time", { ascending: true });
   if (error) return new Response(error.message, { status: 400 });
   return Response.json(data);
 }
@@ -41,13 +41,18 @@ export async function POST(req: NextRequest) {
     .select("workspace_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!wm) return new Response("No workspace", { status: 400 });
 
+  // Calculer start_time et end_time à partir de date + time
+  const start_time = `${body.date}T${body.time}:00`;
+  const duration = Number(body.duration_minutes || 30);
+  const end_time = new Date(new Date(start_time).getTime() + duration * 60000).toISOString();
+
   const { data, error } = await supabase.from("appointments").insert({
     workspace_id: wm.workspace_id,
     client_id: body.client_id,
-    date: body.date,
-    duration_minutes: body.duration_minutes ?? 30,
+    start_time,
+    end_time,
     status: body.status ?? 'planned',
-    type: body.type ?? null,
+    title: body.type ?? 'Consultation',
     notes: body.notes ?? null
   }).select("id").maybeSingle();
   if (error) return new Response(error.message, { status: 400 });
