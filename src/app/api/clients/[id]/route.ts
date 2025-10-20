@@ -9,16 +9,20 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, workspace_id, first_name, last_name, email, phone, birthdate, notes, created_at")
+    .select("id, workspace_id, first_name, last_name, email, phone, notes, created_at")
     .eq("id", params.id)
     .maybeSingle();
-  if (error || !client) return new Response("Not found", { status: 404 });
+  if (error) {
+    console.error("Client fetch error:", error);
+    return Response.json({ error: error.message }, { status: 400 });
+  }
+  if (!client) return Response.json({ error: "Not found" }, { status: 404 });
 
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, date, duration_minutes, status")
+    .select("id, start_time, end_time, status, title")
     .eq("client_id", params.id)
-    .order("date", { ascending: false });
+    .order("start_time", { ascending: false });
 
   return Response.json({ ...client, appointments: appointments || [] });
 }
@@ -33,12 +37,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       last_name: body.last_name,
       email: body.email ?? null,
       phone: body.phone ?? null,
-      birthdate: body.birthdate ?? null,
       notes: body.notes ?? null
     })
     .eq("id", params.id);
-  if (error) return new Response(error.message, { status: 400 });
-  return new Response("ok");
+  if (error) {
+    console.error("Client update error:", error);
+    return Response.json({ error: error.message }, { status: 400 });
+  }
+  return Response.json({ success: true });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -47,6 +53,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const { error } = await supabase.from("clients")
     .delete()
     .eq("id", params.id);
-  if (error) return new Response(error.message, { status: 400 });
-  return new Response("ok");
+  if (error) {
+    console.error("Client delete error:", error);
+    return Response.json({ error: error.message }, { status: 400 });
+  }
+  return Response.json({ success: true });
 }

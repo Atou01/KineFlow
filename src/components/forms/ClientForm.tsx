@@ -12,7 +12,6 @@ const clientSchema = z.object({
   last_name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide").optional().or(z.literal("")),
   phone: z.string().min(10, "Numéro de téléphone invalide").optional().or(z.literal("")),
-  birthdate: z.string().optional().or(z.literal("")),
   notes: z.string().optional().or(z.literal("")),
 });
 
@@ -154,19 +153,6 @@ export function ClientForm({ initialData, clientId, mode }: ClientFormProps) {
             {errors.phone && (
               <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>
             )}
-          </div>
-
-          {/* Date de naissance */}
-          <div>
-            <label htmlFor="birthdate" className="block text-sm font-medium text-gray-700 mb-2">
-              Date de naissance
-            </label>
-            <input
-              {...register("birthdate")}
-              type="date"
-              id="birthdate"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
           </div>
         </div>
 

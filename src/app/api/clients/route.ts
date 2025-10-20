@@ -14,11 +14,14 @@ export async function GET() {
   if (!wm) return new Response("No workspace", { status: 400 });
 
   const { data, error } = await supabase.from("clients")
-    .select("id, first_name, last_name, email, phone, created_at")
+    .select("id, first_name, last_name, email, phone, notes, created_at")
     .eq("workspace_id", wm.workspace_id)
     .order("created_at", { ascending: false });
-  if (error) return new Response(error.message, { status: 400 });
-  return Response.json(data);
+  if (error) {
+    console.error("Clients fetch error:", error);
+    return Response.json({ error: error.message }, { status: 400 });
+  }
+  return Response.json(data || []);
 }
 
 export async function POST(req: NextRequest) {
@@ -38,9 +41,11 @@ export async function POST(req: NextRequest) {
     last_name: body.last_name,
     email: body.email ?? null,
     phone: body.phone ?? null,
-    birthdate: body.birthdate ?? null,
     notes: body.notes ?? null
   }).select("id").maybeSingle();
-  if (error) return new Response(error.message, { status: 400 });
+  if (error) {
+    console.error("Client insert error:", error);
+    return Response.json({ error: error.message }, { status: 400 });
+  }
   return Response.json(data);
 }
