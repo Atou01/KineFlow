@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { enforceQuota } from "@/lib/billing";
+// import { enforceQuota } from "@/lib/billing"; // Temporarily disabled for testing
 
 export const dynamic = 'force-dynamic';
 
