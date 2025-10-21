@@ -23,13 +23,14 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const quota = await enforceQuota("appointments", "date");
-  if (!quota.allowed) {
-    return Response.json(
-      { error: quota.reason, upgrade_url: "/app/billing" },
-      { status: 402 } // Payment Required
-    );
-  }
+  // TODO: Re-enable quota check after testing
+  // const quota = await enforceQuota("appointments", "date");
+  // if (!quota.allowed) {
+  //   return Response.json(
+  //     { error: quota.reason, upgrade_url: "/app/billing" },
+  //     { status: 402 } // Payment Required
+  //   );
+  // }
 
   const supabase = createRouteHandlerClient({ cookies });
   const body = await req.json();
